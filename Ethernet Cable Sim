@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador de crimpado de cable Ethernet</title>
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet">
+<style>
+:root{--wood:#c9ad78;--wood2:#bfa06a;--panel:#d4a843;--ink:#111;--paper:#fff8e6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{height:100%;margin:0;background:#000;color:#fff;font-family:'Patrick Hand','Comic Sans MS',cursive;overflow:hidden;touch-action:none}
+#app{height:100%;display:grid;grid-template-columns:76px 1fr 76px;grid-template-rows:1fr 40px;max-width:1000px;margin:0 auto}
+.panel{background:var(--panel);display:flex;flex-direction:column;justify-content:space-around;align-items:center;padding:6px 0;border:3px solid var(--ink)}
+.tool{width:60px;height:60px;border-radius:12px;border:3px solid var(--ink);background:#f1d98a;font-size:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;color:var(--ink);cursor:pointer}
+.tool small{font-size:11px;margin-top:2px}
+.tool.on{background:#fff;outline:4px solid #e2552b}
+.tool:active{transform:scale(.94)}
+#stagewrap{position:relative;overflow:hidden;background:repeating-linear-gradient(90deg,var(--wood) 0 7px,var(--wood2) 7px 9px,#cfb582 9px 17px,var(--wood) 17px 20px)}
+#hint{display:none;position:absolute;top:6px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:6px 14px;border-radius:14px;font-size:17px;text-align:center;width:min(92%,420px);z-index:5;pointer-events:none}
+#toast{position:absolute;top:6px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:6px 14px;border-radius:14px;font-size:17px;text-align:center;width:min(78%,420px);z-index:40;pointer-events:none;opacity:0;transition:opacity .25s}
+#toast.show{opacity:1}
+#help{position:fixed;left:calc(max(0px,(100vw - 1000px)/2) + 86px);top:calc(env(safe-area-inset-top,0px) + 10px);width:42px;height:42px;border-radius:50%;background:#7fd0e8;border:3px solid var(--ink);color:var(--ink);font-size:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;z-index:30;touch-action:none;cursor:grab}
+#help small{display:none}
+#help.drag{filter:drop-shadow(0 6px 6px #0008);cursor:grabbing}
+#reset{position:absolute;top:6px;right:6px;z-index:6;background:var(--ink);color:#fff;border:0;border-radius:10px;padding:6px 10px;font:inherit;font-size:15px}
+#cable{position:absolute;left:50%;bottom:0;width:290px;height:340px;transform-origin:50% 100%;margin-left:-145px}
+#jacket{position:absolute;left:0;bottom:0;width:290px;background:linear-gradient(90deg,#aaa,#e6e6e6 30%,#d9d9d9 70%,#9a9a9a);border-top:3px solid #888}
+#wires{position:absolute;left:9px;bottom:0;width:272px;height:0}
+.wire{position:absolute;bottom:0;width:28px;border:2px solid var(--ink);border-radius:14px 14px 2px 2px;transition:left .15s,height .2s}
+.wire.drag{transition:none;z-index:9;filter:drop-shadow(0 4px 4px #0006)}
+.pair{position:absolute;bottom:0;width:62px;border:2px solid var(--ink);border-radius:10px 10px 2px 2px}
+#conn{position:absolute;left:0;width:290px;height:150px;bottom:0;border:3px solid #6aa;border-radius:6px;background:linear-gradient(#cfeeff99,#9fd6f2aa);display:none;transition:bottom .4s}
+#conn i{position:absolute;top:6px;width:20px;height:34px;background:#d8b230;border:1px solid #6b5410;transition:height .15s,top .15s}
+#conn.crimped i{height:20px;top:20px}
+#conn::after{content:'';position:absolute;left:30%;right:30%;top:-16px;height:16px;background:#cfeeff;border:3px solid #6aa;border-bottom:0}
+#tester{position:absolute;left:50%;top:44px;transform:translateX(-50%);background:#2a2a2a;border:3px solid var(--ink);border-radius:12px;padding:8px 10px;display:none;z-index:7;text-align:center}
+#tester .leds{display:flex;gap:6px;margin-top:4px}
+.led{width:22px;height:22px;border-radius:50%;background:#555;border:2px solid #000;font-size:12px;color:#000;display:flex;align-items:center;justify-content:center}
+.led.ok{background:#4be05a;box-shadow:0 0 8px #4be05a}.led.bad{background:#ff4a3a;box-shadow:0 0 8px #ff4a3a}
+#bar{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;padding:0 10px;font-size:18px;background:#000}
+#bar b{font-weight:400;color:#ffe9a8}
+#trail{position:absolute;inset:0;pointer-events:none;z-index:8}
+#result{position:absolute;inset:0;z-index:20;background:#000a;display:none;align-items:center;justify-content:center;padding:8px}
+#rcard{background:var(--paper);color:var(--ink);border:4px solid var(--ink);border-radius:16px;width:min(100%,460px);max-height:100%;overflow-y:auto;touch-action:pan-y;padding:12px 16px;text-align:center}
+#rcard h2{margin:0;font-size:34px;font-weight:400;line-height:1.1}
+#rcard h2.fail{color:#c0301c}
+#rcard p{margin:4px 0 8px;font-size:16px;line-height:1.25}
+#chips{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;text-align:left;font-size:15px;margin-bottom:8px}
+.chip{display:flex;align-items:center;gap:6px;padding:2px 4px;border-radius:6px}
+.chip.wrong{background:#ffb9ae}
+.chip span{width:14px;height:14px;border:2px solid var(--ink);border-radius:50%;flex:none}
+#stats{display:flex;justify-content:space-around;font-size:15px;margin-bottom:10px;border-top:2px dashed #0004;padding-top:6px}
+#rbtns{display:flex;gap:10px;justify-content:center}
+#rbtns button{font:inherit;font-size:18px;padding:10px 16px;min-height:44px;border:3px solid var(--ink);border-radius:12px;background:#f1d98a;color:var(--ink)}
+#rbtns button.main{background:#e2552b;color:#fff}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="panel" id="tools">
+    <div class="tool on" data-t="hand">✋<small>Mano</small></div>
+    <div class="tool" data-t="strip">🗜️<small>Pelacables</small></div>
+    <div class="tool" data-t="cut">✂️<small>Cortador</small></div>
+  </div>
+  <div id="stagewrap">
+    <div id="hint"></div><div id="toast"></div>
+    <button id="reset">Cable nuevo</button>
+    <div id="help">?<small>Help</small></div>
+    <div id="tester"><div id="tmsg">Probador</div><div class="leds" id="leds"></div></div>
+    <div id="cable">
+      <div id="jacket"></div>
+      <div id="wires"></div>
+      <div id="conn"></div>
+    </div>
+    <div id="result"><div id="rcard"></div></div>
+    <svg id="trail"><polyline id="pl" fill="none" stroke="#e2552b" stroke-width="4" stroke-linecap="round" points=""/></svg>
+  </div>
+  <div class="panel" id="equip">
+    <div class="tool" data-e="conn">🔌<small>RJ45</small></div>
+    <div class="tool" data-e="crimp">🔧<small>Crimpadora</small></div>
+    <div class="tool" data-e="test">📟<small>Probador</small></div>
+  </div>
+  <div id="bar"><span>Tiempo: <b id="time">00:00:00</b></span><span><b id="cm">0.0</b> cm de cable usados</span><span><b id="cn">0</b> conector(es) usados</span></div>
+</div>
+<script>
+// Wire definitions: base colour + whether striped with white
+const W={OW:['#f0a030',1],O:['#f0a030',0],GW:['#2fb33a',1],B:['#1f4fd8',0],BW:['#1f4fd8',1],G:['#2fb33a',0],BrW:['#8a5a28',1],Br:['#8a5a28',0]};
+const B568=['OW','O','GW','B','BW','G','BrW','Br'];
+const A568=['GW','G','OW','B','BW','O','BrW','Br'];
+const PAIRS=[['B','BW'],['O','OW'],['G','GW'],['Br','BrW']];
+const SLOT=34, JH_MAX=330;
+let S;
+const $=id=>document.getElementById(id);
+const hints=[
+ 'Pick the Stripper, then swipe across the jacket to strip it.',
+ 'Pick the Hand and tap each twisted pair to untwist it.',
+ 'Drag wires sideways into T568B order: orange-white, orange, green-white, blue, blue-white, green, brown-white, brown.',
+ 'Pick the Cutter and swipe across the wire tips to trim them even.',
+ 'Tap the RJ45 connector to slide it onto the wires.',
+ 'Tap the Crimper to crimp the connector.',
+ 'Tap the Tester to check the cable.',
+ 'Done! Tap New cable to practice again.'];
+function init(keepCount){
+  S={step:0,tool:'hand',jh:JH_MAX,untw:[0,0,0,0],order:[],len:[],cut:0,t0:Date.now(),conn:keepCount?S.conn:0,connOn:false,crimped:false};
+  S.order=PAIRS.flat();
+  S.len=S.order.map(()=>0);
+  $('tester').style.display='none';$('result').style.display='none';$('conn').style.display='none';$('conn').classList.remove('crimped');
+  selTool('strip');render();
+}
+function swatch(k){const[c,s]=W[k];return s?`repeating-linear-gradient(-55deg,${c} 0 7px,#fff 7px 14px)`:c}
+function render(){
+  const ex=JH_MAX+10-S.jh; // exposed length
+  const stripped=S.step>=1;
+  $('jacket').style.height=S.jh+'px';
+  const w=$('wires');w.innerHTML='';w.style.bottom=S.jh+'px';w.style.position='absolute';w.style.height=ex+'px';
+  w.parentNode.style.setProperty('--x','0');
+  w.style.bottom=S.jh+'px';
+  if(stripped){
+    const exL=Math.max(20,JH_MAX+10-S.jh);
+    if(S.step===1){
+      PAIRS.forEach((p,i)=>{
+        if(S.untw[i]){p.forEach((k,j)=>addWire(k,i*2+j,exL));return}
+        const d=document.createElement('div');d.className='pair';
+        d.style.left=(i*2*SLOT-2)+'px';d.style.width='64px';d.style.height=exL+'px';
+        d.style.background=`repeating-linear-gradient(-62deg,${W[p[0]][0]} 0 9px,${W[p[1]][1]?'#fff':W[p[1]][0]} 9px 18px,${W[p[1]][0]} 18px 22px,${W[p[0]][0]} 22px 28px)`;
+        d.dataset.pair=i;w.appendChild(d);
+      });
+    }else S.order.forEach((k,i)=>addWire(k,i,S.len[i]||exL));
+  }
+  updConn();
+  $('hint').textContent=hints[S.step];
+  $('cm').textContent=(Math.max(0,(JH_MAX+10-S.jh))*0.0075+S.cut*0.0).toFixed(1);
+  $('cn').textContent=S.conn;
+}
+function addWire(k,i,len){
+  const d=document.createElement('div');d.className='wire';d.dataset.i=i;d.dataset.k=k;
+  d.style.left=((S.x&&S.x[i]!=null?S.x[i]:i*SLOT))+'px';d.style.height=len+'px';d.style.background=swatch(k);
+  $('wires').appendChild(d);
+}
+function updConn(){
+  const c=$('conn');
+  if(!S.connOn){c.style.display='none';return}
+  c.style.display='block';c.style.bottom=(S.jh-30)+'px';
+  if(!c.children.length)for(let i=0;i<8;i++){const p=document.createElement('i');p.style.left=(14+i*34)+'px';c.appendChild(p)}
+  c.classList.toggle('crimped',S.crimped);
+}
+function selTool(t){S.tool=t;document.querySelectorAll('[data-t]').forEach(e=>e.classList.toggle('on',e.dataset.t===t))}
+document.querySelectorAll('[data-t]').forEach(e=>e.onclick=()=>selTool(e.dataset.t));
+let tt;function flash(m,ms){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),ms||2600)}
+
+// scaling to fit the stage
+function fit(){const h=$('stagewrap').clientHeight-8;const s=Math.min(1,h/340,($('stagewrap').clientWidth)/300);$('cable').style.transform=`scale(${s})`;S&&(S.scale=s)}
+addEventListener('resize',fit);
+
+// gestures on stage
+let g=null;
+const sw=$('stagewrap');
+function toCable(e){const r=$('cable').getBoundingClientRect();const s=S.scale||1;return{x:(e.clientX-r.left)/s,y:340-(r.bottom-e.clientY)/s}}
+sw.addEventListener('pointerdown',e=>{
+  if(e.target.id==='reset')return;
+  sw.setPointerCapture(e.pointerId);
+  const p=toCable(e);g={sx:e.clientX,sy:e.clientY,pts:[[e.clientX,e.clientY]],p0:p,wire:null};
+  const wr=e.target.closest('.wire'),pr=e.target.closest('.pair');
+  if(S.tool==='hand'){
+    if(pr&&S.step===1){S.untw[+pr.dataset.pair]=1;if(S.untw.every(Boolean))S.step=2;S.step===2&&(S.step=2);render();if(S.untw.every(Boolean)){S.step=2;S.len=S.order.map(()=>0);S.x=S.order.map((k,i)=>Math.max(0,Math.min(244,i*SLOT+(Math.random()*30-15))));render()}return}
+    if(wr&&S.step>=2&&S.step<=3){g.wire=wr;wr.classList.add('drag');g.base=+wr.style.left.replace('px','')}
+  }
+});
+sw.addEventListener('pointermove',e=>{
+  if(!g)return;g.pts.push([e.clientX,e.clientY]);
+  if(g.wire){const s=S.scale||1;g.wire.style.left=(g.base+(e.clientX-g.sx)/s)+'px'}
+  else if(S.tool!=='hand'){const r=sw.getBoundingClientRect();$('pl').setAttribute('points',g.pts.map(p=>`${p[0]-r.left},${p[1]-r.top}`).join(' '))}
+});
+function end(e){
+  if(!g)return;$('pl').setAttribute('points','');
+  const s=S.scale||1,dx=Math.abs(e.clientX-g.sx)/s,dy=Math.abs(e.clientY-g.sy)/s,p=toCable(e);
+  if(g.wire){
+    const from=+g.wire.dataset.i;const nx=Math.max(0,Math.min(244,g.base+(e.clientX-g.sx)/s));S.x[from]=nx;const ix=S.order.map((_,i)=>i).sort((p,q)=>S.x[p]-S.x[q]);S.order=ix.map(i=>S.order[i]);S.len=ix.map(i=>S.len[i]);S.x=ix.map(i=>S.x[i]);
+    
+    S.step=Math.max(S.step,3);render();
+  }else if(dx>90&&dx>dy*1.5){
+    const yUp=(g.p0.y+p.y)/2;// y in cable coords (0 top ... 340 bottom)
+    if(S.tool==='strip'&&S.step===0){
+      const jh=340-yUp;
+      if(jh>=JH_MAX+10-250&&jh<=JH_MAX+10-110){S.jh=jh;S.step=1;render()}
+      else flash(jh>JH_MAX-100?'Se peló muy poco. Desliza más arriba en la cubierta.':'Se peló demasiado. Desliza más abajo.');
+    }else if(S.tool==='strip'){flash('La cubierta ya está pelada.')}
+    else if(S.tool==='cut'&&S.step>=3&&S.step<=3){
+      const len=(340-yUp)-S.jh;
+      if(len<20){flash('Eso cortaría la cubierta. Desliza más arriba.');}
+      else{S.order.forEach((k,i)=>S.len[i]=Math.min(S.len[i]||len+1,len));S.len=S.len.map(()=>len);S.step=4;S.cutLen=len;render();
+        if(len>105)flash('Cortados, pero los cables quedaron largos. Puede que el conector no entre.');
+        else if(len<55)flash('Cortados, pero los cables quedaron cortos. Los pines podrían no tocar.');
+      }
+    }else if(S.tool==='cut'&&S.step<3)flash('Termina de ordenar los cables antes de cortarlos.');
+    else if(S.tool==='cut')flash('Ya están cortados.');
+    else if(S.tool==='hand')flash('Usa el pelacables o el cortador para deslizar.');
+  }
+  g=null;
+}
+sw.addEventListener('pointerup',end);sw.addEventListener('pointercancel',end);
+
+// equipment
+document.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{
+  const e=b.dataset.e;
+  if(e==='conn'){
+    if(S.step<4)return flash('Primero ordena y corta los cables.');
+    if(S.step>4)return flash('El conector ya está puesto.');
+    if(S.x.some((x,i)=>Math.abs(x-i*SLOT)>8))return flash('Los cables están chuecos o mal espaciados. Acomoda cada uno en su ranura.');
+    if(S.cutLen>105)return flash('Cables muy largos, la cubierta no llegará a la pinza. Haz un cable nuevo.');
+    if(S.cutLen<55)return flash('Cables muy cortos para llegar a los pines. Haz un cable nuevo.');
+    S.connOn=true;S.conn++;S.step=5;updConn();$('hint').textContent=hints[5];$('cn').textContent=S.conn;
+  }
+  if(e==='crimp'){
+    if(S.step<5)return flash('Primero coloca un conector.');
+    if(S.step>5)return flash('Ya está crimpado.');
+    S.crimped=true;S.step=6;updConn();$('hint').textContent=hints[6];if(navigator.vibrate)navigator.vibrate(60);
+  }
+  if(e==='test'){
+    if(S.step<6)return flash('Crimpa el conector antes de probar.');
+    const T=$('tester');T.style.display='block';const L=$('leds');L.innerHTML='';
+    const b=S.order.map((k,i)=>k===B568[i]),a=S.order.map((k,i)=>k===A568[i]);
+    const pass=b.every(Boolean)||a.every(Boolean);const res=b.filter(Boolean).length>=a.filter(Boolean).length?b:a;
+    res.forEach((ok,i)=>{const d=document.createElement('div');d.className='led '+(pass||ok?'ok':'bad');d.textContent=i+1;L.appendChild(d)});
+    $('tmsg').textContent=pass?'APROBADO: el cable cumple el estándar':'FALLO: cables desordenados';
+    if(pass){S.step=7;$('hint').textContent=hints[7]}else flash('La prueba falló. Toca Cable nuevo y repítelo.');
+    const isB=b.every(Boolean),isA=a.every(Boolean);
+    setTimeout(()=>showResult(isB,isA,b,a),1200);
+  }
+});
+$('reset').onclick=()=>{init(true);fit()};
+$('result').addEventListener('pointerdown',e=>e.stopPropagation());
+const NAMES={OW:'Blanco-naranja',O:'Naranja',GW:'Blanco-verde',B:'Azul',BW:'Blanco-azul',G:'Verde',BrW:'Blanco-café',Br:'Café'};
+function showResult(isB,isA,b,a){
+  const type=isB?'T568B':isA?'T568A':'No es un cable estándar';
+  const msg=isB?'Par naranja en los pines 1 y 2, par verde en los pines 3 y 6. Es el estándar más común. Arma el otro extremo como T568B para un cable directo, o como T568A para uno cruzado.'
+   :isA?'Par verde en los pines 1 y 2, par naranja en los pines 3 y 6. Arma el otro extremo como T568A para un cable directo, o como T568B para uno cruzado.'
+   :'El orden de los cables no coincide con T568A ni con T568B, así que este cable no transmitiría datos de forma confiable. Los pines en rojo están mal colocados.';
+  const exp=(isA||(!isB&&a.filter(Boolean).length>b.filter(Boolean).length))?A568:B568;
+  const chips=S.order.map((k,i)=>`<div class="chip${k!==exp[i]?' wrong':''}"><span style="background:${swatch(k)}"></span>${i+1}. ${NAMES[k]}</div>`).join('');
+  const t=Math.floor((Date.now()-S.t0)/1000);
+  $('rcard').innerHTML=`<h2 class="${isA||isB?'':'fail'}">${isA||isB?'Resultado: ':''}${type}</h2><p>${msg}</p><div id="chips">${chips}</div><div id="stats"><span>Tiempo: ${Math.floor(t/60)} min ${t%60} s</span><span>Cable: ${$('cm').textContent} cm</span><span>Conectores: ${S.conn}</span></div><div id="rbtns"><button id="rview">Ver cable</button><button class="main" id="rnew">Cable nuevo</button></div>`;
+  $('result').style.display='flex';
+  $('rview').onclick=()=>$('result').style.display='none';
+  $('rnew').onclick=()=>{init(true);fit()};
+}
+setInterval(()=>{const t=Math.floor((Date.now()-S.t0)/1000),f=n=>String(n).padStart(2,'0');$('time').textContent=`${f(t/3600|0)}:${f(t/60%60|0)}:${f(t%60)}`},500);
+const HELP={hand:'Mano: toca un par trenzado para destrenzarlo y luego arrastra cada cable suelto hacia los lados para colocarlo.',strip:'Pelacables: desliza el dedo sobre la cubierta para quitarla y dejar los pares a la vista. Ni muy poco ni demasiado.',cut:'Cortador: desliza el dedo sobre las puntas para dejarlas parejas y lo bastante cortas para el conector.',conn:'Conector RJ45: tócalo para meterlo en los cables cortados. Deben estar en orden y bien espaciados.',crimp:'Crimpadora: tócala para presionar los pines del conector contra los cables y fijarlo.',test:'Probador: tócalo para revisar el cable. Las luces muestran cada pin y el resultado dice T568A, T568B o ninguno.'};
+(function(){const h=$('help');let d=null;
+h.addEventListener('pointerdown',e=>{e.stopPropagation();h.setPointerCapture(e.pointerId);d={x:e.clientX,y:e.clientY};h.classList.add('drag')});
+h.addEventListener('pointermove',e=>{if(!d)return;h.style.transform=`translate(${e.clientX-d.x}px,${e.clientY-d.y}px)`});
+h.addEventListener('pointerup',e=>{if(!d)return;const moved=Math.hypot(e.clientX-d.x,e.clientY-d.y)>12;h.style.display='none';const el=document.elementFromPoint(e.clientX,e.clientY);h.style.display='';h.style.transform='';h.classList.remove('drag');d=null;
+  if(!moved)return flash('Arrastra el botón de ayuda sobre una herramienta para ver qué hace.',3500);
+  const t=el&&el.closest('[data-t],[data-e]');
+  if(t)flash(HELP[t.dataset.t||t.dataset.e],7000);else flash('Suelta el botón de ayuda sobre una herramienta o un equipo.',3000)});
+h.addEventListener('pointercancel',()=>{d=null;h.style.transform='';h.classList.remove('drag')});
+})();
+init(false);fit();
+</script>
+</body>
+</html>
